@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//cygdrive/c/Users/CBabin/projects/**)",
+      "Bash(cargo init)",
+      "Bash(cargo build:*)",
+      "Bash(cargo test:*)",
+      "Bash(PYTHONIOENCODING=utf-8 python3:*)"
+    ]
+  }
+}

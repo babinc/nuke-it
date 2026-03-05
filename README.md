@@ -4,7 +4,7 @@
 
 ![nuke-it](screenshot.png)
 
-A file shredder that doesn't just delete your files — it **nukes them from orbit**. Because moving to the recycle bin is for people who still believe in second chances.
+A file shredder that doesn't just delete your files - it **nukes them from orbit**. Because moving to the recycle bin is for people who still believe in second chances.
 
 ## What It Does
 

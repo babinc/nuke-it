@@ -63,10 +63,7 @@ fn random_quip<'a>(quips: &'a [&'a str]) -> &'a str {
   nuke-it -n -r ./old-projects/         Preview what would be nuked (safe)
   nuke-it -y -p 7 *.pdf                 7 passes, skip confirmation
   nuke-it --wipe-free-space             Wipe free space on current drive
-  nuke-it --wipe-free-space D:\\         Wipe free space on D:\\
-
-  \x1b[2mNote: On SSDs, wear-leveling may retain old data at the firmware level.
-  For SSDs, full-disk encryption (e.g. BitLocker) is the strongest guarantee.\x1b[0m"
+  nuke-it --wipe-free-space D:\\         Wipe free space on D:\\"
 )]
 struct Args {
     /// Files or directories to nuke

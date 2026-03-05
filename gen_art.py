@@ -100,13 +100,14 @@ Mh = (105, 105, 115)    # gun highlight
 Mf = (200, 160, 40)     # muzzle flash (dimmer)
 W  = (200, 200, 200)    # teeth (not blinding white)
 
-# Background mushroom cloud colors (bright enough to read as explosion)
-C1 = (150, 90, 18)      # core amber
-C2 = (110, 62, 12)      # mid orange
-C3 = (70, 42, 12)       # edge dark
-C4 = (175, 110, 22)     # bright glow
-C5 = (195, 135, 30)     # hot highlight
-Cf = (130, 35, 10)      # fire accent
+# Side mushroom cloud colors (bright, unmistakable explosion)
+C1 = (185, 115, 20)     # core amber
+C2 = (145, 80, 12)      # mid orange
+C3 = (95, 55, 10)       # edge
+C4 = (210, 145, 30)     # bright glow
+C5 = (230, 170, 45)     # hot highlight
+Cf = (165, 40, 10)      # fire accent
+Cs = (60, 50, 42)       # smoke edge
 
 # ── DUKE BODY (40w x 36h) — no cloud, just the character ──
 duke_body = [
@@ -140,10 +141,10 @@ duke_body = [
     # Row 18-19: mid torso
     [_, _, _, _, _, S, S, R, R, R,Rk, R, R, R, R, R,Rk, R, R, S, S, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
     [_, _, _, _, _, _, S, R, R, R, R, R, R, R, R, R, R, R, S, S, S, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
-    # Row 20: arm extends, holding long gun barrel + big muzzle flash
-    [_, _, _, _, _, _, _, R, R, R, R, R, R, R, R, R, R, R, S, _, _, S, M, M, M, M, M, M, M, Mh,Mh,Mf,Mf,Mf,Mf, _, _, _, _, _, _],
-    # Row 21: hand grip visible below barrel
-    [_, _, _, _, _, _, _, R, R,Rk, R, R, R, R, R, R,Rk, R, _, _, _, S, S, M, M, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    # Row 20: arm extends out to gun — thin arm (2px), then barrel + flash
+    [_, _, _, _, _, _, _, R, R, R, R, R, R, R, R, R, R, R, R, S, S, M, M, M, M, M, M, M, M, Mh,Mh,Mf,Mf,Mf,Mf, _, _, _, _, _, _],
+    # Row 21: hand gripping below barrel
+    [_, _, _, _, _, _, _, R, R,Rk, R, R, R, R, R, R,Rk, R, _, _, S, M, M, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
     # Row 22-23: waist
     [_, _, _, _, _, _, _, _,Rk, R, R, R, R, R, R, R, R,Rk, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
     [_, _, _, _, _, _, _, _, B, B, B, B,Bh,Bh,Bh,Bh, B, B, B, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -165,83 +166,94 @@ duke_body = [
     [_, _, _, _, _, _, _,Bk,Bk,Bt,Bt,Bt,Bk, _, _, _,Bk,Bt,Bt,Bt,Bk,Bk, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-# ── Generate mushroom cloud background ──
-def make_cloud(w, h):
-    """Procedural mushroom cloud that fills the background behind Duke."""
+# ── Generate standalone mushroom cloud for banner ──
+def make_side_cloud(w, h):
+    """Standalone mushroom cloud to sit beside Duke in the banner."""
     grid = [[None] * w for _ in range(h)]
-    cx = 31  # cloud center x (right side of frame)
+    cx = w / 2.0
 
-    for y in range(min(h, 22)):
+    def hot(d):
+        """Bright center gradient."""
+        if d < 0.15: return C5
+        if d < 0.35: return C4
+        if d < 0.55: return C1
+        if d < 0.75: return C2
+        if d < 0.9: return C3
+        return Cs
+
+    for y in range(h):
         for x in range(w):
             dx = x - cx
             val = None
 
-            # Mushroom cap (big oval, rows 0-9)
-            cap_cy = 4.0
-            cap_rx = 8.5
-            cap_ry = 5.0
+            # === MUSHROOM CAP (rows 0-11) ===
+            # Flat wide ellipse - THE defining shape
+            cap_cy = 5.0
+            cap_rx = w * 0.48
+            cap_ry = 5.5
             dc = math.sqrt((dx / cap_rx) ** 2 + ((y - cap_cy) / cap_ry) ** 2)
             if dc < 1.0:
-                if dc < 0.2:
-                    val = C5
-                elif dc < 0.4:
-                    val = C4
-                elif dc < 0.6:
-                    val = C1
-                elif dc < 0.8:
-                    val = C2
-                else:
-                    val = C3
+                val = hot(dc)
+                # Fire ring detail inside cap
+                if 0.3 < dc < 0.5 and 2 <= y <= 8:
+                    val = Cf
 
-            # Fire ring inside cap (donut shape for detail)
-            if 0.35 < dc < 0.55 and 1 <= y <= 7:
-                val = Cf
+            # Billowing top (extra pixels on top of cap for rounder look)
+            if 0 <= y <= 2:
+                top_rx = w * 0.3 - y * 0.5
+                if abs(dx) < top_rx:
+                    d = abs(dx) / top_rx
+                    val = hot(d * 0.7 + 0.2)  # slightly dimmer
 
-            # Stem (rows 8-15, narrow column)
-            if 8 <= y <= 15:
-                sw = 2.2 + (y - 8) * 0.15
+            # === NARROW NECK (rows 11-13) - must be VERY thin ===
+            if 11 <= y <= 13:
+                nw = 1.5
+                if abs(dx) < nw:
+                    d = abs(dx) / nw
+                    val = C4 if d < 0.5 else C1
+                elif val is not None:
+                    val = None  # clear any cap bleed
+
+            # === STEM (rows 14-21) - narrow fire column ===
+            if 14 <= y <= 21:
+                sw = 1.8 + (y - 14) * 0.25
                 if abs(dx) < sw:
                     d = abs(dx) / sw
-                    if d < 0.3:
-                        val = C4
-                    elif d < 0.6:
-                        val = C1
-                    elif val is None:
-                        val = C3
+                    if d < 0.3: val = C4
+                    elif d < 0.6: val = C1
+                    else: val = C3
 
-            # Base bloom (rows 13-20, spreading wide)
-            if 13 <= y <= 21:
-                base_cy = 17.0
-                base_rx = 9.0
-                base_ry = 4.5
+            # === GROUND RING (rows 20-30) - spreading debris ===
+            if 20 <= y <= 30:
+                base_cy = 25.0
+                base_rx = w * 0.45
+                base_ry = 5.5
                 db = math.sqrt((dx / base_rx) ** 2 + ((y - base_cy) / base_ry) ** 2)
                 if db < 1.0:
-                    if db < 0.2:
-                        val = C5
-                    elif db < 0.4:
-                        val = C4
-                    elif db < 0.6:
-                        val = C1
-                    elif db < 0.8:
-                        val = C2
-                    elif val is None:
-                        val = C3
+                    val = hot(db)
 
             grid[y][x] = val
     return grid
 
-cloud = make_cloud(40, 36)
-
-# Composite: Duke's body pixels over cloud background
-duke = []
+# Build banner grid: full Duke (including gun arm) + cloud to the right
+DUKE_PAD = 36   # pad duke rows to this width (gun reaches col ~33)
+CLOUD_W = 18
+side_cloud = make_side_cloud(CLOUD_W, 36)
+duke = duke_body
+banner_grid = []
 for y in range(len(duke_body)):
-    row = []
-    bw = len(duke_body[y])
-    for x in range(40):
-        body_px = duke_body[y][x] if x < bw else None
-        cloud_px = cloud[y][x] if y < len(cloud) and x < len(cloud[y]) else None
-        row.append(body_px if body_px is not None else cloud_px)
-    duke.append(row)
+    row = list(duke_body[y])
+    # Pad to fixed width so cloud aligns
+    if len(row) < DUKE_PAD:
+        row += [None] * (DUKE_PAD - len(row))
+    else:
+        row = row[:DUKE_PAD]
+    # Add cloud
+    if y < len(side_cloud):
+        row += side_cloud[y]
+    else:
+        row += [None] * CLOUD_W
+    banner_grid.append(row)
 
 
 # ── MUSHROOM CLOUD (40w x 30h, ominous) ─
@@ -291,6 +303,7 @@ nuke = [
 
 # ── Generate output ──────────────────────
 duke_lines = render_art(duke, "        ")
+banner_lines = render_art(banner_grid, "    ")
 nuke_lines = render_art(nuke, "    ")
 
 # Title text for right side of duke banner
@@ -428,15 +441,13 @@ title_lines = render_title("NUKE-IT", T, Td)
 with open("src/art.rs", "w", encoding="utf-8") as f:
     f.write("// Auto-generated ANSI true-color pixel art. Do not edit by hand.\n\n")
 
-    # DUKE_BANNER: duke + title on right
+    # DUKE_BANNER: title on top, then duke + mushroom cloud side by side
     f.write("pub const DUKE_BANNER: &str = \"\\\n")
-    for i, line in enumerate(duke_lines):
-        right = ""
-        # Place title next to duke's torso area (rows 4-10)
-        ti = i - 4
-        if 0 <= ti < len(title_lines):
-            right = title_lines[ti]
-        f.write(f"\\n{line}{right}\\\n")
+    for line in title_lines:
+        f.write(f"\\n        {line}\\\n")
+    f.write("\\n\\\n")  # blank line between title and art
+    for line in banner_lines:
+        f.write(f"\\n{line}\\\n")
     f.write("\\n\";\n\n")
 
     # DUKE_ART: just duke (used for shred/done/abort/wipe prompts)
