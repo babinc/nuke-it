@@ -2,6 +2,11 @@
 name = "nuke-it"
 version = "0.4.0"
 edition = "2024"
+license = "MIT"
+description = "It's time to kick ass and chew bubblegum... and I'm all outta gum."
+repository = "https://github.com/babinc/nuke-it"
+keywords = ["shred", "secure-delete", "file-shredder", "wipe"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 rand = "0.8"
