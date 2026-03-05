@@ -13,7 +13,7 @@ A file shredder that doesn't just delete your files - it **nukes them from orbit
 ## Install
 
 ```bash
-cargo install --path .
+cargo install nuke-it
 ```
 
 ## Usage
