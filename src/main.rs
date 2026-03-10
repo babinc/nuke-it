@@ -4,6 +4,8 @@ use rand::{Rng, RngCore};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Seek, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 const RED: &str = "\x1b[1;31m";
 const YELLOW: &str = "\x1b[1;33m";
@@ -63,7 +65,8 @@ fn random_quip<'a>(quips: &'a [&'a str]) -> &'a str {
   nuke-it -n -r ./old-projects/         Preview what would be nuked (safe)
   nuke-it -y -p 7 *.pdf                 7 passes, skip confirmation
   nuke-it --wipe-free-space             Wipe free space on current drive
-  nuke-it --wipe-free-space D:\\         Wipe free space on D:\\"
+  nuke-it --wipe-free-space D:\\         Wipe free space on D:\\
+  nuke-it --stealth -r ./old-projects/  Throttle I/O to avoid EDR alerts"
 )]
 struct Args {
     /// Files or directories to nuke
@@ -84,6 +87,14 @@ struct Args {
     /// Show what would be nuked without deleting anything
     #[arg(short = 'n', long)]
     dry_run: bool,
+
+    /// Throttle file operations with random delays to avoid triggering EDR/antivirus alerts
+    #[arg(long)]
+    stealth: bool,
+
+    /// Delay in milliseconds between file operations in stealth mode [default: 500]
+    #[arg(long, default_value_t = 500, value_parser = clap::value_parser!(u64).range(50..))]
+    stealth_delay: u64,
 
     /// Wipe free space with random data to destroy previously deleted files
     #[arg(long, num_args = 0..=1, default_missing_value = ".", value_name = "PATH")]
@@ -274,10 +285,18 @@ fn overwrite_file(path: &Path, passes: u32, buf: &mut [u8]) -> io::Result<()> {
     Ok(())
 }
 
+fn stealth_sleep(stealth_delay_ms: Option<u64>) {
+    if let Some(base_ms) = stealth_delay_ms {
+        let jitter = rand::thread_rng().gen_range(0..=base_ms / 2);
+        thread::sleep(Duration::from_millis(base_ms + jitter));
+    }
+}
+
 fn shred_path_with_progress(
     path: &Path,
     passes: u32,
     recursive: bool,
+    stealth_delay_ms: Option<u64>,
     pb: &ProgressBar,
     buf: &mut [u8],
 ) -> io::Result<usize> {
@@ -291,7 +310,7 @@ fn shred_path_with_progress(
                 });
                 continue;
             }
-            shredded += shred_path_with_progress(&entry_path, passes, recursive, pb, buf)?;
+            shredded += shred_path_with_progress(&entry_path, passes, recursive, stealth_delay_ms, pb, buf)?;
         }
         // Directory removal is best-effort — Windows may lock special folders
         // (e.g. Screenshots). The files inside are already gone, so this is cosmetic.
@@ -308,6 +327,7 @@ fn shred_path_with_progress(
             }
         }
     } else if path.is_file() {
+        stealth_sleep(stealth_delay_ms);
         let file_name = path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -586,6 +606,9 @@ fn main() {
         for path in &args.paths {
             let _ = print_dry_run(path, args.recursive, 0);
         }
+        if args.stealth {
+            println!("\n  {DIM}Stealth mode: ~{}ms delay between files{RESET}", args.stealth_delay);
+        }
         println!();
         if !confirm(&format!("  {RED}This CANNOT be undone. Let's rock! [y/N]{RESET} ")) {
             println!("  Aborted.");
@@ -607,11 +630,12 @@ fn main() {
             .progress_chars("##-"),
     );
 
+    let stealth_delay_ms = if args.stealth { Some(args.stealth_delay) } else { None };
     let mut buf = vec![0u8; BUF_SIZE];
     let mut shredded = 0usize;
     let mut errors = 0usize;
     for path in &args.paths {
-        match shred_path_with_progress(path, args.passes, args.recursive, &pb, &mut buf) {
+        match shred_path_with_progress(path, args.passes, args.recursive, stealth_delay_ms, &pb, &mut buf) {
             Ok(count) => shredded += count,
             Err(e) => {
                 pb.suspend(|| {
@@ -729,7 +753,7 @@ mod tests {
 
         let pb = ProgressBar::hidden();
         let mut buf = test_buf();
-        shred_path_with_progress(&dir, 3, true, &pb, &mut buf).unwrap();
+        shred_path_with_progress(&dir, 3, true, None, &pb, &mut buf).unwrap();
 
         assert!(!dir.exists(), "Directory still exists after recursive shred!");
     }
